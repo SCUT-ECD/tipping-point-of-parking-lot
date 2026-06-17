@@ -1,1 +1,86 @@
+# -*- coding: utf-8 -*-
+from __future__ import print_function
 
+import time
+import pandas as pd
+import json
+import ssl, hmac, base64, hashlib
+import openpyxl
+from datetime import datetime as pydatetime
+def task():
+ try:
+    from urllib import urlencode
+    from urllib2 import Request, urlopen
+ except ImportError:
+    from urllib.parse import urlencode
+    from urllib.request import Request, urlopen
+
+# 云市场分配的密钥Id
+ secretId = ""
+# 云市场分配的密钥Key
+ secretKey = ""
+ source = "market"
+
+# 签名
+ datetime = pydatetime.utcnow().strftime('%a, %d %b %Y %H:%M:%S GMT')
+ signStr = "x-date: %s\nx-source: %s" % (datetime, source)
+ sign = base64.b64encode(hmac.new(secretKey.encode('utf-8'), signStr.encode('utf-8'), hashlib.sha1).digest())
+ auth = 'hmac id="%s", algorithm="hmac-sha1", headers="x-date x-source", signature="%s"' % (
+ secretId, sign.decode('utf-8'))
+
+# 请求方法
+ method = 'POST'
+# 请求头
+ headers = {
+    'X-Source': source,
+    'X-Date': datetime,
+    'Authorization': auth,
+
+ }
+# 查询参数
+ queryParams = {
+ }
+# body参数（POST方法下存在）
+ bodyParams = {
+    "city": "广州市",
+    "page": "1",
+    "size": "50"}
+# url参数拼接
+ url = 'https://service-1wxot8ee-1305308687.gz.apigw.tencentcs.com/release/parking/query/city'
+ if len(queryParams.keys()) > 0:
+    url = url + '?' + urlencode(queryParams)
+
+ request = Request(url, headers=headers)
+ request.get_method = lambda: method
+ if method in ('POST', 'PUT', 'PATCH'):
+    request.data = urlencode(bodyParams).encode('utf-8')
+    request.add_header('Content-Type', 'application/x-www-form-urlencoded')
+ ctx = ssl.create_default_context()
+ ctx.check_hostname = False
+ ctx.verify_mode = ssl.CERT_NONE
+
+ try:
+    response = urlopen(request, context=ctx)
+    content = response.read()
+    # 假设content是JSON格式的响应内容
+    data = json.loads(content)
+
+    # 将数据转换为DataFrame
+    df = pd.DataFrame(data)
+
+    timestamp = pydatetime.now().strftime('%Y%m%d%H%M%S')
+    excel_file_path = f'output_{timestamp}.xlsx'
+
+    # 保存到Excel文件
+    df.to_excel(excel_file_path, index=False)
+
+    print(f"数据已保存到 {excel_file_path}")
+ except Exception as e:
+    print(f"发生错误: {e}")
+
+for i in range(2):
+    # 执行任务
+    task()
+
+    # 休眠10秒（单位为秒）
+    time.sleep(3)
